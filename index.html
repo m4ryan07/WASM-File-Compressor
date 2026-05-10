@@ -1,0 +1,410 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Huffman Engine · C-WASM Codec</title>
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@3.19.0/dist/tabler-icons.min.css">
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600&display=swap');
+
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --bg:        #080c14;
+      --surface:   #0d1420;
+      --surface2:  #0a111c;
+      --border:    #1a2840;
+      --border2:   #1e2d45;
+      --blue:      #378ADD;
+      --blue-dim:  #185FA5;
+      --blue-pale: #85B7EB;
+      --teal:      #1D9E75;
+      --teal-dim:  #0F6E56;
+      --teal-pale: #5DCAA5;
+      --muted:     #4a6280;
+      --muted2:    #2d4a6e;
+      --text:      #e2e8f0;
+      --text-dim:  #94a3b8;
+      --red:       #E24B4A;
+    }
+
+    body {
+      font-family: 'JetBrains Mono', monospace;
+      background: var(--bg);
+      color: var(--text);
+      min-height: 100vh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 2rem 1rem;
+    }
+
+    body::before {
+      content: '';
+      position: fixed;
+      inset: 0;
+      background-image:
+        linear-gradient(var(--border) 1px, transparent 1px),
+        linear-gradient(90deg, var(--border) 1px, transparent 1px);
+      background-size: 48px 48px;
+      opacity: 0.25;
+      pointer-events: none;
+    }
+
+    .card {
+      background: var(--surface);
+      border: 0.5px solid var(--border2);
+      border-radius: 16px;
+      width: 420px;
+      padding: 2rem;
+      position: relative;
+      overflow: hidden;
+    }
+
+    .card::before {
+      content: '';
+      position: absolute;
+      top: 0; left: 0; right: 0;
+      height: 2px;
+      background: linear-gradient(90deg,
+        var(--border2) 0%,
+        var(--blue) 35%,
+        var(--teal) 65%,
+        var(--border2) 100%
+      );
+    }
+
+    .card::after {
+      content: '';
+      position: absolute;
+      top: -60px; right: -60px;
+      width: 180px; height: 180px;
+      background: radial-gradient(circle, #378ADD11 0%, transparent 70%);
+      pointer-events: none;
+    }
+
+    .header {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      margin-bottom: 0.5rem;
+    }
+
+    .logo {
+      width: 38px; height: 38px;
+      border-radius: 9px;
+      background: #0e1f35;
+      border: 0.5px solid #378ADD33;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      flex-shrink: 0;
+    }
+
+    .logo i { font-size: 19px; color: var(--blue); }
+
+    .title { font-size: 15px; font-weight: 600; color: var(--text); letter-spacing: 0.05em; }
+    .subtitle { font-size: 10px; color: var(--muted); letter-spacing: 0.1em; margin-top: 2px; }
+
+    .badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      font-size: 10px;
+      color: var(--teal-pale);
+      background: #04342c55;
+      border: 0.5px solid #1D9E7544;
+      border-radius: 20px;
+      padding: 3px 10px;
+      letter-spacing: 0.07em;
+      margin-top: 1rem;
+      margin-bottom: 1.5rem;
+    }
+
+    .badge-dot {
+      width: 5px; height: 5px;
+      border-radius: 50%;
+      background: var(--teal);
+      animation: pulse 2s ease-in-out infinite;
+    }
+
+    @keyframes pulse {
+      0%, 100% { opacity: 1; }
+      50% { opacity: 0.3; }
+    }
+
+    .section {
+      background: var(--surface2);
+      border: 0.5px solid var(--border);
+      border-radius: 10px;
+      padding: 1rem;
+      margin-bottom: 0.75rem;
+    }
+
+    .section-label {
+      font-size: 10px;
+      color: var(--muted);
+      letter-spacing: 0.1em;
+      margin-bottom: 0.75rem;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    .section-label i { font-size: 13px; }
+
+    .drop-zone {
+      border: 1px dashed var(--border2);
+      border-radius: 8px;
+      padding: 1.1rem 1rem;
+      text-align: center;
+      cursor: pointer;
+      transition: border-color 0.2s, background 0.2s;
+      position: relative;
+      margin-bottom: 8px;
+    }
+
+    .drop-zone:last-of-type { margin-bottom: 0; }
+    .drop-zone:hover { border-color: #378ADD55; background: #0e1f3511; }
+    .drop-zone.has-file { border-color: #1D9E7555; background: #04342c22; }
+    .drop-zone.has-file .drop-icon i { color: var(--teal-pale); }
+
+    .drop-zone input[type=file] {
+      position: absolute;
+      inset: 0;
+      opacity: 0;
+      cursor: pointer;
+      width: 100%;
+      height: 100%;
+    }
+
+    .drop-icon { font-size: 20px; color: var(--muted2); margin-bottom: 5px; }
+    .drop-text  { font-size: 11px; color: var(--muted); }
+    .drop-name  { font-size: 11px; color: var(--teal-pale); margin-top: 4px; font-weight: 500; min-height: 16px; }
+
+    .btn {
+      width: 100%;
+      padding: 10px 16px;
+      border-radius: 8px;
+      border: none;
+      cursor: pointer;
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 12px;
+      font-weight: 500;
+      letter-spacing: 0.07em;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+      transition: all 0.15s;
+      margin-top: 0.75rem;
+    }
+
+    .btn:active { transform: scale(0.98); }
+    .btn i { font-size: 15px; }
+
+    .btn-compress {
+      background: #0e2848;
+      color: var(--blue-pale);
+      border: 0.5px solid #185FA555;
+    }
+    .btn-compress:hover { background: #132f57; border-color: #378ADD88; color: #B5D4F4; }
+
+    .btn-decompress {
+      background: #04251c;
+      color: var(--teal-pale);
+      border: 0.5px solid #0F6E5655;
+    }
+    .btn-decompress:hover { background: #052e22; border-color: #1D9E7588; color: #9FE1CB; }
+
+    .divider {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      margin: 0.75rem 0;
+    }
+
+    .divider-line { flex: 1; height: 0.5px; background: var(--border); }
+    .divider-text { font-size: 10px; color: var(--muted2); letter-spacing: 0.1em; }
+
+    .status-bar {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      margin-top: 1rem;
+      padding: 8px 12px;
+      background: var(--surface2);
+      border-radius: 8px;
+      border: 0.5px solid var(--border);
+    }
+
+    .status-icon { font-size: 14px; line-height: 1; }
+    .status-text { font-size: 11px; letter-spacing: 0.04em; flex: 1; }
+    .s-idle    { color: var(--muted); }
+    .s-working { color: var(--blue); }
+    .s-ok      { color: var(--teal); }
+    .s-err     { color: var(--red); }
+
+    .status-hex { font-size: 9px; color: var(--muted2); letter-spacing: 0.08em; }
+
+    @keyframes spin { to { transform: rotate(360deg); } }
+    .spinning { animation: spin 1s linear infinite; display: inline-block; }
+  </style>
+</head>
+<body>
+
+<div class="card">
+  <div class="header">
+    <div class="logo">
+      <i class="ti ti-binary-tree" aria-hidden="true"></i>
+    </div>
+    <div>
+      <div class="title">HUFFMAN ENGINE</div>
+      <div class="subtitle">C → WASM · LOSSLESS CODEC</div>
+    </div>
+  </div>
+
+  <div class="badge">
+    <span class="badge-dot"></span>
+    <span>WASM MODULE READY</span>
+  </div>
+
+  <!-- COMPRESS -->
+  <div class="section">
+    <div class="section-label">
+      <i class="ti ti-file-zip" style="color:var(--blue)" aria-hidden="true"></i>
+      COMPRESS
+    </div>
+    <div class="drop-zone" id="dz1">
+      <input type="file" id="fileInput" onchange="markFile(this,'lbl1','dz1')">
+      <div class="drop-icon"><i class="ti ti-upload" aria-hidden="true"></i></div>
+      <div class="drop-text">Drop file or click to select</div>
+      <div class="drop-name" id="lbl1">—</div>
+    </div>
+    <button class="btn btn-compress" onclick="process('compress')">
+      <i class="ti ti-file-zip" aria-hidden="true"></i>
+      COMPRESS → .BIN
+    </button>
+  </div>
+
+  <div class="divider">
+    <div class="divider-line"></div>
+    <div class="divider-text">RESTORE</div>
+    <div class="divider-line"></div>
+  </div>
+
+  <!-- DECOMPRESS -->
+  <div class="section">
+    <div class="section-label">
+      <i class="ti ti-file-import" style="color:var(--teal)" aria-hidden="true"></i>
+      DECOMPRESS
+    </div>
+    <div class="drop-zone" id="dz2">
+      <input type="file" id="treeFile" onchange="markFile(this,'lbl2','dz2')">
+      <div class="drop-icon"><i class="ti ti-file-code" aria-hidden="true"></i></div>
+      <div class="drop-text">.BIN compressed file</div>
+      <div class="drop-name" id="lbl2">—</div>
+    </div>
+    <div class="drop-zone" id="dz3">
+      <input type="file" id="origFile" onchange="markFile(this,'lbl3','dz3')">
+      <div class="drop-icon"><i class="ti ti-file-text" aria-hidden="true"></i></div>
+      <div class="drop-text">Original file (to rebuild tree)</div>
+      <div class="drop-name" id="lbl3">—</div>
+    </div>
+    <button class="btn btn-decompress" onclick="process('decompress')">
+      <i class="ti ti-file-export" aria-hidden="true"></i>
+      RESTORE ORIGINAL
+    </button>
+  </div>
+
+  <!-- STATUS -->
+  <div class="status-bar">
+    <span class="status-icon" id="sIcon">
+      <i class="ti ti-circle-dashed" style="color:var(--muted2)" aria-hidden="true"></i>
+    </span>
+    <span class="status-text s-idle" id="sText">Awaiting input</span>
+    <span class="status-hex" id="sHex">0x00</span>
+  </div>
+</div>
+
+<!-- Load your compiled WASM JS here -->
+<script src="compressor.js"></script>
+
+<script>
+  function markFile(inp, lblId, dzId) {
+    const lbl = document.getElementById(lblId);
+    const dz  = document.getElementById(dzId);
+    if (inp.files[0]) {
+      lbl.textContent = inp.files[0].name;
+      dz.classList.add('has-file');
+    }
+  }
+
+  function setStatus(type, msg, hex) {
+    const icon  = document.getElementById('sIcon');
+    const text  = document.getElementById('sText');
+    const hexEl = document.getElementById('sHex');
+
+    const cfg = {
+      idle:    { icon: 'ti-circle-dashed', color: 'var(--muted2)', cls: 's-idle',    spin: false },
+      working: { icon: 'ti-loader-2',       color: 'var(--blue)',   cls: 's-working', spin: true  },
+      ok:      { icon: 'ti-circle-check',   color: 'var(--teal)',   cls: 's-ok',      spin: false },
+      err:     { icon: 'ti-alert-circle',   color: 'var(--red)',    cls: 's-err',     spin: false },
+    };
+
+    const c = cfg[type];
+    const spinClass = c.spin ? 'spinning' : '';
+    icon.innerHTML = `<i class="ti ${c.icon} ${spinClass}" style="color:${c.color}" aria-hidden="true"></i>`;
+    text.className = `status-text ${c.cls}`;
+    text.textContent = msg;
+    if (hexEl) hexEl.textContent = hex || '0x00';
+  }
+
+  async function process(mode) {
+    if (mode === 'compress') {
+      const f = document.getElementById('fileInput').files[0];
+      if (!f) { setStatus('err', 'No file selected', '0xEE'); return; }
+
+      setStatus('working', 'Encoding…', '0x01');
+      try {
+        const buf = await f.arrayBuffer();
+        Module.FS.writeFile('input_data', new Uint8Array(buf));
+        Module.cwrap('run_compression', 'number', [])();
+        const res = Module.FS.readFile('output.bin');
+        const ratio = (res.length / f.size * 100).toFixed(1);
+        download(res, f.name + '.bin');
+        setStatus('ok', `Done — ${ratio}% of original`, '0xC0');
+      } catch (e) {
+        setStatus('err', 'Engine error', '0xFF');
+      }
+
+    } else {
+      const bin  = document.getElementById('treeFile').files[0];
+      const orig = document.getElementById('origFile').files[0];
+      if (!bin)  { setStatus('err', 'Missing .bin file', '0xEE'); return; }
+      if (!orig) { setStatus('err', 'Missing original for tree', '0xEF'); return; }
+
+      setStatus('working', 'Rebuilding Huffman tree…', '0x02');
+      try {
+        Module.FS.writeFile('input_data', new Uint8Array(await bin.arrayBuffer()));
+        Module.FS.writeFile('tree_data',  new Uint8Array(await orig.arrayBuffer()));
+        Module.cwrap('run_decompression', 'number', [])();
+        const res = Module.FS.readFile('restored_file');
+        download(res, bin.name.replace('.bin', ''));
+        setStatus('ok', 'Restored successfully', '0xC1');
+      } catch (e) {
+        setStatus('err', 'Decompression failed', '0xFF');
+      }
+    }
+  }
+
+  function download(data, name) {
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(new Blob([data], { type: 'application/octet-stream' }));
+    a.download = name;
+    a.click();
+  }
+</script>
+</body>
+</html>
